@@ -22,9 +22,9 @@ LOGGER = set_logger(__name__)
 def check_variance(args=args):
     LOGGER.info(f"{args}")
     df, ins_type = load_pickle(args.df)
-    sebool = get_variance(df, check_ratio=args.ratio, n_display=args.disp)
-    return sebool, df
+    get_variance(df, check_ratio=args.ratio, n_display=args.disp)
+    return df
 
 
 if __name__ == "__main__":
-    sebool, df = check_variance(args=args)
+    df = check_variance(args=args)

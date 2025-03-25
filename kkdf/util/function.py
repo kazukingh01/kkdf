@@ -155,7 +155,7 @@ def check_polars_diff(df1: pl.DataFrame, df2: pl.DataFrame, indexes: list[str]=N
             LOGGER.info(f"df2: \n{df2.filter(~index)[sewk.name]}")
     return df1, df2
 
-def get_variance(df: pl.DataFrame | pd.DataFrame, check_ratio: float=0.95, n_divide: int=10000, n_display: int=5) -> pd.Series:
+def get_variance(df: pl.DataFrame | pd.DataFrame, check_ratio: float=0.95, n_divide: int=10000, n_display: int=5):
     assert isinstance(df, (pl.DataFrame, pd.DataFrame))
     if isinstance(df, pd.DataFrame):
         df = pl.from_pandas(df)
