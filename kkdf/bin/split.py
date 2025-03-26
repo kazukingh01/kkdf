@@ -76,10 +76,10 @@ def split(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
         LOGGER.info(f"Concat: {idxs}. indexes: {idx_new}")
         if ins_type == "polars":
             df_new = df[idx_new]
-            df_new.write_parquet(f"{args.df}.split{args.nsplit}.{'|'.join([str(i) for i in idxs])}.parquet", compression="zstd")
+            df_new.write_parquet(f"{args.df}.split{args.nsplit}.{'+'.join([str(i) for i in idxs])}.parquet", compression="zstd")
         elif ins_type == "pandas":
             df_new = df.iloc[idx_new]
-            df_new.to_pickle(f"{args.df}.split{args.nsplit}.{'|'.join([str(i) for i in idxs])}.pickle")
+            df_new.to_pickle(f"{args.df}.split{args.nsplit}.{'+'.join([str(i) for i in idxs])}.pickle")
         else:
             LOGGER.raise_error(f"Unknown dataframe type: {ins_type}", exception=ValueError(f"Unknown dataframe type: {ins_type}"))
         if list_df is not None:
