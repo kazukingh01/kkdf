@@ -1,4 +1,6 @@
 import argparse
+import pandas as pd
+import polars as pl
 from kkdf.util.function import check_pandas_diff, check_polars_diff, load_pickle
 from kklogger import set_logger
 from kkdf.util.com import check_type_list
@@ -18,9 +20,10 @@ args   = parser.parse_args()
 LOGGER = set_logger(__name__)
 
 
-def check_diff(args=args):
+def check_diff(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
     LOGGER.info(f"{args}")
     assert args.index is None or check_type_list(args.index, str)
+    assert list_df is None or list_df == []
     df1, ins_type = load_pickle(args.df1)
     df2, ins_type2 = load_pickle(args.df2)
     assert ins_type == ins_type2
@@ -31,10 +34,12 @@ def check_diff(args=args):
     elif ins_type == "polars":
         assert args.index is not None
         check_polars_diff(df1, df2, indexes=args.index)
-    print(df1)
-    print(df2)
-    return df1, df2
+    if list_df is not None:
+        list_df.append(df1)
+        list_df.append(df2)
 
 
 if __name__ == "__main__":
-    df1, df2 = check_diff(args=args)
+    list_df = []
+    check_diff(args=args, list_df=list_df)
+    df1, df2 = list_df

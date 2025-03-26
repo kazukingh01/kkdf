@@ -21,10 +21,11 @@ args   = parser.parse_args()
 LOGGER = set_logger(__name__)
 
 
-def concat(args=args):
+def concat(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
     LOGGER.info(f"{args}")
     assert len(args.paths) >= 2
     assert args.sort is None or check_type_list(args.sort, str)
+    assert list_df is None or list_df == []
     list_df, ins_type, ignore_index = [], None, False
     for x in args.paths:
         LOGGER.info(f"load {x} ...")
@@ -55,8 +56,12 @@ def concat(args=args):
         df.to_pickle(args.output)
     elif ins_type == "polars":
         df.write_parquet(args.output, compression="zstd")
-    return df
+    if list_df is not None:
+        list_df.append(df)
 
 
 if __name__ == "__main__":
-    df = concat(args=args)
+    list_df = []
+    df = concat(args=args, list_df=list_df)
+    if list_df is not None:
+        list_df.append(df)

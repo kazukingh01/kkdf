@@ -1,7 +1,6 @@
 import argparse
 import pandas as pd
 import polars as pl
-import numpy as np
 from kkdf.util.function import load_pickle, get_variance
 from kklogger import set_logger
 
@@ -19,12 +18,17 @@ args   = parser.parse_args()
 LOGGER = set_logger(__name__)
 
 
-def check_variance(args=args):
+def check_variance(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
     LOGGER.info(f"{args}")
-    df, ins_type = load_pickle(args.df)
+    assert list_df is None or list_df == []
+    df, _ = load_pickle(args.df)
     get_variance(df, check_ratio=args.ratio, n_display=args.disp)
-    return df
+    if list_df is not None:
+        list_df.append(df)
 
 
 if __name__ == "__main__":
-    df = check_variance(args=args)
+    list_df = []
+    df = check_variance(args=args, list_df=list_df)
+    if list_df is not None:
+        list_df.append(df)
