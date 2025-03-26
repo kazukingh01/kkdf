@@ -45,7 +45,7 @@ def concat(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
     if ins_type == "pandas":
         df = pd.concat(list_df, axis=0, ignore_index=ignore_index, sort=False)
     elif ins_type == "polars":
-        df = pl.concat(list_df, how="vertical", rechunk=True, parallel=True)
+        df = pl.concat(list_df, how="vertical_relaxed", rechunk=True, parallel=True)
     if args.sort is not None:
         if ins_type == "pandas":
             df = df.sort_values(args.sort, ascending=True)
