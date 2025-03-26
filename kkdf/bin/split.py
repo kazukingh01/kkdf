@@ -19,6 +19,7 @@ parser.add_argument("--nsplit",  type=int, help="number of split. ex) --nsplit 5
 parser.add_argument("--concat",  type=lambda x: [[int(z) for z in y.split("+")] for y in x.split(",")], help="concat for spliting validation and save them. ex) --concat 0123,45,6,7", required=True),
 parser.add_argument("--seed",    type=int, help="random seed. ex) --seed 0", default=0),
 parser.add_argument("--splitby", type=lambda x: x.split(","), help="split by. ex) --splitby class1,class2", default=None),
+parser.add_argument("--ignan",   action="store_true", help="ignore nan when 'splitby' is specified. ex) --ignan", default=False),
 args   = parser.parse_args()
 LOGGER = set_logger(__name__)
 random.seed(args.seed)
@@ -37,6 +38,8 @@ def split(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
     assert isinstance(args.seed, int) and args.seed >= 0
     if args.splitby is not None:
         assert isinstance(args.splitby, list) and check_type_list(args.splitby, str)
+    if args.ignan:
+        assert args.splitby is not None
     df, ins_type = load_pickle(args.df)
     indexes      = np.arange(df.shape[0], dtype=int)
     if args.splitby is None:
@@ -46,9 +49,23 @@ def split(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
         splitter   = MultilabelStratifiedKFold(n_splits=args.nsplit, shuffle=True, random_state=args.seed)
         ndf_target = None
         if ins_type == "polars":
-            ndf_target = df.select(args.splitby).to_numpy()
+            dfwk = df.select(args.splitby)
+            if args.ignan:
+                ndf_bool = dfwk.with_columns([
+                    pl.col(pl.Float32).fill_nan(None).is_null(),
+                    pl.col(pl.Float64).fill_nan(None).is_null(),
+                    pl.col(pl.Int32).is_null(),
+                    pl.col(pl.Int64).is_null(),
+                ]).to_numpy().sum(axis=-1).astype(bool)
+                indexes = indexes[~ndf_bool]
+                dfwk    = dfwk.filter(~ndf_bool)
+            ndf_target = dfwk.to_numpy()
         elif ins_type == "pandas":
             ndf_target = df[args.splitby].to_numpy()
+            if args.ignan:
+                ndf_bool   = np.isnan(ndf_target).sum(axis=-1).astype(bool)
+                ndf_target = ndf_target[~ndf_bool]
+                indexes    = indexes[~ndf_bool]            
         assert isinstance(ndf_target, np.ndarray)
         LOGGER.info(f"split by: {ndf_target}")
         if len(args.splitby) == 1:
