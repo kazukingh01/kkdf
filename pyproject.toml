@@ -1,14 +1,15 @@
 [project]
 name = "kkdf"
-version = "1.0.2"
+version = "1.0.3"
 requires-python = ">= 3.12"
 description = "My dataframe tools."
 dependencies = [
     'kklogger @ git+https://github.com/kazukingh01/kklogger.git@f6ddcc099da0102a14a62d67bede1b1c30eaf839',
-    'pandas>=2.2.3',   # tested by pandas==2.2.3
-    'numpy>=2.2.1',   # tested by numpy==2.2.1
-    'polars>=1.18.0',  # tested by polars==1.18.0
-    'pyarrow>=18.1.0', # tested by pyarrow==18.1.0
+    'pandas>=2.2.3',                   # tested by pandas==2.2.3
+    'numpy>=2.2.1',                    # tested by numpy==2.2.1
+    'polars>=1.18.0',                  # tested by polars==1.18.0
+    'pyarrow>=18.1.0',                 # tested by pyarrow==18.1.0
+    'iterative-stratification>=0.1.9', # tested by iterative-stratification==0.1.9
 ]
 
 [build-system]
@@ -22,3 +23,4 @@ packages = ["kkdf", "kkdf.util", "kkdf.bin"]
 kkdfdiff   = "kkdf.bin.check_diff:check_diff"
 kkdfconcat = "kkdf.bin.concat:concat"
 kkdfvar    = "kkdf.bin.check_variance:check_variance"
+kkdfsplit  = "kkdf.bin.split:split"

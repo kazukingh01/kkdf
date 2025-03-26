@@ -62,6 +62,5 @@ def concat(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
 
 if __name__ == "__main__":
     list_df = []
-    df = concat(args=args, list_df=list_df)
-    if list_df is not None:
-        list_df.append(df)
+    concat(args=args, list_df=list_df)
+    df = list_df[0]
