@@ -15,6 +15,7 @@ __all__ = [
 
 
 def load_pickle(path: str) -> tuple[pl.DataFrame | pd.DataFrame | object, str]:
+    assert isinstance(path, str)
     ins_type = None
     try:
         df = pd.read_pickle(path)
