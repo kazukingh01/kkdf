@@ -135,12 +135,13 @@ def check_polars_diff(df1: pl.DataFrame, df2: pl.DataFrame, indexes: list[str]=N
     ndfbool = ((dfbool.to_numpy() == False).sum(axis=-1) > 0)
     LOGGER.info(   f"all same data indexes: {df1[indexes].filter(~ndfbool)}", color=["BOLD", "BLUE"])
     LOGGER.warning(f"some different data indexes: {df1[indexes].filter( ndfbool)}")
+    ndf_index = df1[indexes].to_numpy()
     for sewk in dfbool:
         if sewk.all():
             LOGGER.info(f"same column: {sewk.name}", color=["BOLD", "BLUE"])
         else:
             LOGGER.warning(f"diff column: {sewk.name}")
-            LOGGER.info(f"idx: \n{df1[indexes].filter(~sewk)}") 
+            LOGGER.info(f"idx: \n{ndf_index[~(sewk.to_numpy())]}") 
             LOGGER.info(f"df1: \n{df1.filter(~sewk)[sewk.name]}")
             LOGGER.info(f"df2: \n{df2.filter(~sewk)[sewk.name]}")
     return df1, df2
