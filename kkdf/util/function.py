@@ -45,6 +45,21 @@ def load_pickle(path: str) -> tuple[pl.DataFrame | pd.DataFrame | object, str]:
         LOGGER.raise_error(f"Unknown dataframe type: {type(df)}", exception=ValueError(f"Unknown dataframe type: {type(df)}"))
     return df, ins_type
 
+def check_index_pandas(ndf1, ndf2, text: str="index"):
+    if len(ndf1) == len(ndf2) == ndf1.isin(ndf2).sum() == ndf2.isin(ndf1).sum():
+        LOGGER.info(f"all {text} is SAME", color=["BOLD", "BLUE"])
+        return ndf1
+    else:
+        LOGGER.warning(f"{text} is different.")
+        ndf_same = ndf1[ndf1.isin(ndf2)].values
+        if len(ndf_same) == 0:
+            LOGGER.warning(f"All {text} is different.")
+            raise
+        LOGGER.info(f"same {text}: {ndf_same}")
+        LOGGER.warning(f"only df1 {text}: {ndf1[~ndf1.isin(ndf2)].values}")
+        LOGGER.warning(f"only df2 {text}: {ndf2[~ndf2.isin(ndf1)].values}")
+        return ndf_same
+
 def check_pandas_diff(df1: pd.DataFrame, df2: pd.DataFrame, value_fillnan: object=-9999):
     assert isinstance(df1, pd.DataFrame)
     assert isinstance(df2, pd.DataFrame)
@@ -54,26 +69,12 @@ def check_pandas_diff(df1: pd.DataFrame, df2: pd.DataFrame, value_fillnan: objec
     LOGGER.info(f"df1 shape: {df1.shape}")
     LOGGER.info(f"df2 shape: {df2.shape}")
     LOGGER.info("check dataframe index.", color=["BOLD", "GREEN"])
-    def check_index(ndf1, ndf2, text: str="index"):
-        if len(ndf1) == len(ndf2) == ndf1.isin(ndf2).sum() == ndf2.isin(ndf1).sum():
-            LOGGER.info(f"all {text} is SAME", color=["BOLD", "BLUE"])
-            return ndf1
-        else:
-            LOGGER.warning(f"{text} is different.")
-            ndf_same = ndf1[ndf1.isin(ndf2)].values
-            if len(ndf_same) == 0:
-                LOGGER.warning(f"All {text} is different.")
-                raise
-            LOGGER.info(f"same {text}: {ndf_same}")
-            LOGGER.warning(f"only df1 {text}: {ndf1[~ndf1.isin(ndf2)].values}")
-            LOGGER.warning(f"only df2 {text}: {ndf2[~ndf2.isin(ndf1)].values}")
-            return ndf_same
     # check row index
     index1, index2 = df1.index, df2.index
-    index_same = check_index(index1, index2, text="index")
-    # check row index
+    index_same = check_index_pandas(index1, index2, text="index")
+    # check col index
     columns1, columns2 = df1.columns, df2.columns
-    columns_same = check_index(columns1, columns2, text="columns")
+    columns_same = check_index_pandas(columns1, columns2, text="columns")
     if len(df1.index) != len(df1.index.unique()): LOGGER.raise_error(f"df1 index is not unique")
     if len(df2.index) != len(df2.index.unique()): LOGGER.raise_error(f"df2 index is not unique")
     if len(df1.columns) != len(df1.columns.unique()): LOGGER.raise_error(f"df1 columns is not unique")
@@ -105,55 +106,43 @@ def check_polars_diff(df1: pl.DataFrame, df2: pl.DataFrame, indexes: list[str]=N
     LOGGER.info(f"df1 shape: {df1.shape}")
     LOGGER.info(f"df2 shape: {df2.shape}")
     LOGGER.info("check dataframe index.", color=["BOLD", "GREEN"])
-    def check_index(idx1: pl.DataFrame, idx2: pl.DataFrame, text: str="index"):
-        ndf_idx1 = np.arange(len(idx1), dtype=np.int64)
-        ndf_idx2 = np.arange(len(idx2), dtype=np.int64)
-        ndfwk    = idx1.with_columns([
-            (pl.col(x) == idx2[x]) | (pl.col(x).is_null() & idx2[x].is_null())
-            for x in idx1.columns
-        ]).to_numpy().sum(axis=0)
-        if len(idx1) == len(idx2) and np.all(ndfwk == len(idx1)):
-            LOGGER.info(f"all {text} is SAME", color=["BOLD", "BLUE"])
-            return ndf_idx1, ndf_idx2
-        else:
-            LOGGER.warning(f"{text} is different.")
-            _idx1 = idx1.to_pandas().set_index(idx1.columns).index.copy()
-            _idx2 = idx2.to_pandas().set_index(idx2.columns).index.copy()
-            ndf_same = _idx1[_idx1.isin(_idx2)].to_numpy()
-            if len(ndf_same) == 0:
-                LOGGER.warning(f"All {text} is different.")
-                raise
-            LOGGER.info(f"same {text}: {ndf_same}")
-            LOGGER.warning(f"only df1 {text}: {_idx1[~_idx1.isin(_idx2)].values}")
-            LOGGER.warning(f"only df2 {text}: {_idx2[~_idx2.isin(_idx1)].values}")
-            return ndf_idx1[_idx1.isin(_idx2)], ndf_idx2[_idx2.isin(_idx1)]
     # check row index
     assert np.all(df1[indexes].with_columns(pl.all().unique().len() == pl.len())[0].to_numpy().reshape(-1)) # Index must be unique
     assert np.all(df2[indexes].with_columns(pl.all().unique().len() == pl.len())[0].to_numpy().reshape(-1)) # Index must be unique
-    df1 = df1.sort(by=indexes, descending=False)
-    df2 = df2.sort(by=indexes, descending=False)
-    ndf_idx1, ndf_idx2 = check_index(df1[indexes], df2[indexes], text="index")
-    df1 = df1[ndf_idx1]
-    df2 = df2[ndf_idx2]
-    # check row index
-    ndf_col1, ndf_col2 = check_index(pl.DataFrame(df1.columns), pl.DataFrame(df2.columns), text="columns")
-    df1 = df1[:, ndf_col1]
-    df2 = df2[:, ndf_col2]
+    df1        = df1.sort(by=indexes, descending=False)
+    df2        = df2.sort(by=indexes, descending=False)
+    ndf_idx1   = df1[indexes].to_pandas().set_index(indexes).index.copy()
+    ndf_idx2   = df2[indexes].to_pandas().set_index(indexes).index.copy()
+    index_same = check_index_pandas(ndf_idx1, ndf_idx2, text="index")
+    df1        = df1.filter(ndf_idx1.isin(index_same))
+    df2        = df2.filter(ndf_idx2.isin(index_same))
+    # check col index
+    index_same = check_index_pandas(pd.Index(df1.columns), pd.Index(df2.columns), text="columns")
+    df1 = df1[:, index_same]
+    df2 = df2[:, index_same]
     LOGGER.info("we check only same indexes and same columns", color=["BOLD", "GREEN"])
     LOGGER.info("check whole data.", color=["BOLD", "GREEN"])
     dfbool = df1.with_columns([
         ((pl.col(x) == df2[x]) | (pl.col(x).is_null() & df2[x].is_null())).alias(x)
         for x in df1.columns
     ])
+    dfbool  = dfbool.with_columns(pl.all().fill_null(False))
+    ndfbool = np.array([x.all() for x in dfbool], dtype=bool)
+    dfbool  = dfbool.select(
+        np.array(dfbool.columns, dtype=object)[ ndfbool].tolist() + 
+        np.array(dfbool.columns, dtype=object)[~ndfbool].tolist()
+    )
+    ndfbool = ((dfbool.to_numpy() == False).sum(axis=-1) > 0)
+    LOGGER.info(   f"all same data indexes: {df1[indexes].filter(~ndfbool)}", color=["BOLD", "BLUE"])
+    LOGGER.warning(f"some different data indexes: {df1[indexes].filter( ndfbool)}")
     for sewk in dfbool:
         if sewk.all():
             LOGGER.info(f"same column: {sewk.name}", color=["BOLD", "BLUE"])
         else:
             LOGGER.warning(f"diff column: {sewk.name}")
-            index = (df1[sewk.name] != df2[sewk.name])
-            LOGGER.info(f"idx: \n{df1[indexes].filter(sewk)}") 
-            LOGGER.info(f"df1: \n{df1.filter(~index)[sewk.name]}")
-            LOGGER.info(f"df2: \n{df2.filter(~index)[sewk.name]}")
+            LOGGER.info(f"idx: \n{df1[indexes].filter(~sewk)}") 
+            LOGGER.info(f"df1: \n{df1.filter(~sewk)[sewk.name]}")
+            LOGGER.info(f"df2: \n{df2.filter(~sewk)[sewk.name]}")
     return df1, df2
 
 def get_variance(df: pl.DataFrame | pd.DataFrame, check_ratio: float=0.95, n_divide: int=10000, n_display: int=5):
