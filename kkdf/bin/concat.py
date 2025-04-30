@@ -25,18 +25,20 @@ def concat(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
     LOGGER.info(f"{args}")
     assert len(args.paths) >= 2
     assert args.sort is None or check_type_list(args.sort, str)
-    assert list_df is None or list_df == []
-    list_df, ins_type, ignore_index = [], None, False
+    assert list_df == []
+    ins_type, ignore_index = None, False
     for x in args.paths:
         LOGGER.info(f"load {x} ...")
         if ins_type is None:
             df, ins_type = load_pickle(x)
             if ins_type == "pandas":
+                assert args.output.endswith(".pickle")
                 if df.index.tolist() == np.arange(df.shape[0], dtype=int).tolist():
                     ignore_index = True
                 else:
                     ignore_index = False
             elif ins_type == "polars":
+                assert args.output.endswith(".parquet")
                 ignore_index = False
         else:
             df, tmp_ins_type = load_pickle(x)
@@ -45,7 +47,16 @@ def concat(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
     if ins_type == "pandas":
         df = pd.concat(list_df, axis=0, ignore_index=ignore_index, sort=False)
     elif ins_type == "polars":
-        df = pl.concat(list_df, how="vertical_relaxed", rechunk=True, parallel=True)
+        cols = list_df[0].columns
+        for fpath, dfwk in zip(args.paths, list_df):
+            if dfwk.columns != cols:
+                for a in dfwk.columns:
+                    if a not in cols:
+                        LOGGER.raise_error(f"column: {a} is not in {args.paths[0]}")
+                for b in cols:
+                    if b not in dfwk.columns:
+                        LOGGER.raise_error(f"column: {b} is not in {fpath}")
+        df   = pl.concat([dfwk[cols] for dfwk in list_df], how="vertical_relaxed", rechunk=True, parallel=True)
     if args.sort is not None:
         if ins_type == "pandas":
             df = df.sort_values(args.sort, ascending=True)
