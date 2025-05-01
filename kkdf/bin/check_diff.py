@@ -12,10 +12,11 @@ parser = argparse.ArgumentParser(
     [kkdfdiff --df1 aa.pickle df2 bb.pickle]
     """
 )
-parser.add_argument("--df1",   type=str, help="dataframe1. ex) --df1 df1.pickle", required=True),
-parser.add_argument("--df2",   type=str, help="dataframe1. ex) --df2 df2.pickle", required=True),
-parser.add_argument("--index", type=lambda x: x.split(","), help="set index. ex) --index race_id,number"),
+parser.add_argument("--df1",     type=str, help="dataframe1. ex) --df1 df1.pickle", required=True),
+parser.add_argument("--df2",     type=str, help="dataframe2. ex) --df2 df2.pickle", required=True),
+parser.add_argument("--index",   type=lambda x: x.split(","), help="set index. ex) --index race_id,number"),
 parser.add_argument("--fillnan", type=float, help="fill nan value. ex) --fillnan -9999", default=-9999),
+parser.add_argument("--unique",  action='store_true', help="convert unique ( groupby.first ). ex) --unique"),
 args   = parser.parse_args()
 LOGGER = set_logger(__name__)
 
@@ -28,11 +29,21 @@ def check_diff(args=args, list_df: list[pd.DataFrame | pl.DataFrame] = None):
     df2, ins_type2 = load_pickle(args.df2)
     assert ins_type == ins_type2
     if ins_type == "pandas" and args.index is not None:
+        if args.unique:
+            LOGGER.warning("convert unique ( groupby.first ).")
+            df1 = df1.groupby(args.index).first()
+            df2 = df2.groupby(args.index).first()
         df1 = df1.set_index(args.index)
         df2 = df2.set_index(args.index)
         check_pandas_diff(df1, df2, value_fillnan=args.fillnan)
     elif ins_type == "polars":
         assert args.index is not None
+        if args.unique:
+            LOGGER.warning("convert unique ( groupby.first ).")
+            col1 = df1.columns.copy()
+            col2 = df2.columns.copy()
+            df1  = df1.group_by(args.index).first().select(col1)
+            df2  = df2.group_by(args.index).first().select(col2)
         check_polars_diff(df1, df2, indexes=args.index)
     if list_df is not None:
         list_df.append(df1)
