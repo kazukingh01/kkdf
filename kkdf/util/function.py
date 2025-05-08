@@ -45,13 +45,13 @@ def load_pickle(path: str) -> tuple[pl.DataFrame | pd.DataFrame | object, str]:
         LOGGER.raise_error(f"Unknown dataframe type: {type(df)}", exception=ValueError(f"Unknown dataframe type: {type(df)}"))
     return df, ins_type
 
-def check_index_pandas(ndf1, ndf2, text: str="index"):
+def check_index_pandas(ndf1: pd.Index, ndf2: pd.Index, text: str="index") -> pd.Index:
     if len(ndf1) == len(ndf2) == ndf1.isin(ndf2).sum() == ndf2.isin(ndf1).sum():
         LOGGER.info(f"all {text} is SAME", color=["BOLD", "BLUE"])
         return ndf1
     else:
         LOGGER.warning(f"{text} is different.")
-        ndf_same = ndf1[ndf1.isin(ndf2)].values
+        ndf_same = ndf1[ndf1.isin(ndf2)]
         if len(ndf_same) == 0:
             LOGGER.warning(f"All {text} is different.")
             raise
@@ -118,8 +118,8 @@ def check_polars_diff(df1: pl.DataFrame, df2: pl.DataFrame, indexes: list[str]=N
     df2        = df2.filter(ndf_idx2.isin(index_same))
     # check col index
     index_same = check_index_pandas(pd.Index(df1.columns), pd.Index(df2.columns), text="columns")
-    df1 = df1[:, index_same]
-    df2 = df2[:, index_same]
+    df1 = df1[:, index_same.tolist()]
+    df2 = df2[:, index_same.tolist()]
     LOGGER.info("we check only same indexes and same columns", color=["BOLD", "GREEN"])
     LOGGER.info("check whole data.", color=["BOLD", "GREEN"])
     dfbool = df1.with_columns([
