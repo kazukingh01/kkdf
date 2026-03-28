@@ -86,11 +86,15 @@ def check_pandas_diff(df1: pd.DataFrame, df2: pd.DataFrame, value_fillnan: objec
     sebool = (df1 == df2).sum() == df1.shape[0]
     for x in sebool.index[sebool.values]:
         LOGGER.info(f"same column: {x}", color=["BOLD", "BLUE"])
+    diff_indexes = pd.Index([], dtype=df1.index.dtype)
     for x in sebool.index[~sebool.values]:
         LOGGER.warning(f"diff column: {x}")
         index = (df1[x] != df2[x])
+        diff_indexes = diff_indexes.union(df1.index[index])
         LOGGER.info(f"df1: \n{df1.loc[index, x]}")
         LOGGER.info(f"df2: \n{df2.loc[index, x]}")
+    if len(diff_indexes) > 0:
+        LOGGER.info(f"summary of all different indexes: \n{diff_indexes.sort_values().to_numpy()}", color=["BOLD", "YELLOW"])
     return df1, df2
 
 def check_polars_diff(df1: pl.DataFrame, df2: pl.DataFrame, indexes: list[str]=None):
@@ -144,6 +148,11 @@ def check_polars_diff(df1: pl.DataFrame, df2: pl.DataFrame, indexes: list[str]=N
             LOGGER.info(f"idx: \n{ndf_index[~(sewk.to_numpy())]}") 
             LOGGER.info(f"df1: \n{df1.filter(~sewk)[sewk.name]}")
             LOGGER.info(f"df2: \n{df2.filter(~sewk)[sewk.name]}")
+    if ndfbool.sum() > 0:
+        ndf_diff_indexes = df1[indexes].filter(ndfbool).to_numpy()
+        if len(indexes) == 1:
+            ndf_diff_indexes = ndf_diff_indexes.reshape(-1)
+        LOGGER.info(f"summary of all different indexes: \n{ndf_diff_indexes}", color=["BOLD", "YELLOW"])
     return df1, df2
 
 def get_variance(df: pl.DataFrame | pd.DataFrame, check_ratio: float=0.95, n_divide: int=10000, n_display: int=5):
