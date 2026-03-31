@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("paths",    type=str, nargs="+", help="write dataframe path.")
 parser.add_argument("--output", type=str, help="output file name. ex) --output ./df_concat.pickle", default="df_concat.pickle"),
 parser.add_argument("--sort",   type=lambda x: x.split(","), help="sort columns. ex) --sort race_id,number"),
+parser.add_argument("--ignore-cols", action="store_true", default=False, help="if set, fill missing columns with null and concat."),
 args   = parser.parse_args()
 LOGGER = set_logger(__name__)
 
@@ -51,13 +52,21 @@ def concat(args=args, list_df: list[pd.DataFrame | pl.DataFrame] | None = None):
     elif ins_type == "polars":
         cols = list_df[0].columns
         for fpath, dfwk in zip(args.paths, list_df):
-            if dfwk.columns != cols:
-                for a in dfwk.columns:
-                    if a not in cols:
-                        LOGGER.raise_error(f"column: {a} is not in {args.paths[0]}")
-                for b in cols:
-                    if b not in dfwk.columns:
-                        LOGGER.raise_error(f"column: {b} is not in {fpath}")
+            if dfwk.columns != cols and args.ignore_cols == False:
+                    for a in dfwk.columns:
+                        if a not in cols:
+                            LOGGER.raise_error(f"column: {a} is not in {args.paths[0]}")
+                    for b in cols:
+                        if b not in dfwk.columns:
+                            LOGGER.raise_error(f"column: {b} is not in {fpath}")
+        if args.ignore_cols:
+            all_cols = list(dict.fromkeys(col for dfwk in list_df for col in dfwk.columns))
+            for fpath, dfwk in zip(args.paths, list_df):
+                missing = [c for c in all_cols if c not in dfwk.columns]
+                if missing:
+                    LOGGER.warning(f"{fpath}: missing columns {missing} will be filled with null.")
+            list_df  = [dfwk.with_columns([pl.lit(None).alias(c) for c in all_cols if c not in dfwk.columns])[all_cols] for dfwk in list_df]
+            cols = all_cols
         df   = pl.concat([dfwk[cols] for dfwk in list_df], how="vertical_relaxed", rechunk=True, parallel=True)
     if args.sort is not None:
         if ins_type == "pandas":

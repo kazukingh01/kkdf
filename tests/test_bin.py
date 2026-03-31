@@ -136,7 +136,7 @@ class TestConcat:
         out = os.path.join(tmp_dir, "out.pickle")
         df1.to_pickle(p1)
         df2.to_pickle(p2)
-        args = make_args(paths=[p1, p2], output=out, sort=None)
+        args = make_args(paths=[p1, p2], output=out, sort=None, ignore_cols=False)
         list_df = []
         concat(args=args, list_df=list_df)
         # list_df contains: df1, df2, concatenated
@@ -153,7 +153,7 @@ class TestConcat:
         out = os.path.join(tmp_dir, "out.pickle")
         df1.to_pickle(p1)
         df2.to_pickle(p2)
-        args = make_args(paths=[p1, p2], output=out, sort=["a"])
+        args = make_args(paths=[p1, p2], output=out, sort=["a"], ignore_cols=False)
         list_df = []
         concat(args=args, list_df=list_df)
         result = list_df[2]
@@ -168,7 +168,7 @@ class TestConcat:
         out = os.path.join(tmp_dir, "out.parquet")
         df1.write_parquet(p1)
         df2.write_parquet(p2)
-        args = make_args(paths=[p1, p2], output=out, sort=None)
+        args = make_args(paths=[p1, p2], output=out, sort=None, ignore_cols=False)
         list_df = []
         concat(args=args, list_df=list_df)
         assert len(list_df) == 3
@@ -184,11 +184,78 @@ class TestConcat:
         out = os.path.join(tmp_dir, "out.parquet")
         df1.write_parquet(p1)
         df2.write_parquet(p2)
-        args = make_args(paths=[p1, p2], output=out, sort=["a"])
+        args = make_args(paths=[p1, p2], output=out, sort=["a"], ignore_cols=False)
         list_df = []
         concat(args=args, list_df=list_df)
         result = list_df[2]
         assert result["a"].to_list() == [1, 2, 3, 4]
+
+    def test_polars_concat_different_cols_error(self, tmp_dir):
+        """--ignore-cols なしでカラムが違う場合はエラー"""
+        from kkdf.bin.concat import concat
+        df1 = pl.DataFrame({"a": [1, 2], "b": [3, 4]})
+        df2 = pl.DataFrame({"a": [5, 6], "c": [7, 8]})
+        p1 = os.path.join(tmp_dir, "df1.parquet")
+        p2 = os.path.join(tmp_dir, "df2.parquet")
+        out = os.path.join(tmp_dir, "out.parquet")
+        df1.write_parquet(p1)
+        df2.write_parquet(p2)
+        args = make_args(paths=[p1, p2], output=out, sort=None, ignore_cols=False)
+        list_df = []
+        with pytest.raises(Exception):
+            concat(args=args, list_df=list_df)
+
+    def test_polars_concat_ignore_cols_missing_in_second(self, tmp_dir):
+        """df2にカラムが足りない場合、--ignore-cols で null 埋め"""
+        from kkdf.bin.concat import concat
+        df1 = pl.DataFrame({"a": [1, 2], "b": [3, 4], "c": [5, 6]})
+        df2 = pl.DataFrame({"a": [7, 8], "b": [9, 10]})
+        p1 = os.path.join(tmp_dir, "df1.parquet")
+        p2 = os.path.join(tmp_dir, "df2.parquet")
+        out = os.path.join(tmp_dir, "out.parquet")
+        df1.write_parquet(p1)
+        df2.write_parquet(p2)
+        args = make_args(paths=[p1, p2], output=out, sort=None, ignore_cols=True)
+        concat(args=args, list_df=[])
+        result = pl.read_parquet(out)
+        assert result.shape == (4, 3)
+        assert result.columns == ["a", "b", "c"]
+        assert result["c"].to_list() == [5, 6, None, None]
+
+    def test_polars_concat_ignore_cols_extra_in_second(self, tmp_dir):
+        """df2に余分なカラムがある場合、--ignore-cols で null 埋め"""
+        from kkdf.bin.concat import concat
+        df1 = pl.DataFrame({"a": [1, 2], "b": [3, 4]})
+        df2 = pl.DataFrame({"a": [5, 6], "b": [7, 8], "c": [9, 10]})
+        p1 = os.path.join(tmp_dir, "df1.parquet")
+        p2 = os.path.join(tmp_dir, "df2.parquet")
+        out = os.path.join(tmp_dir, "out.parquet")
+        df1.write_parquet(p1)
+        df2.write_parquet(p2)
+        args = make_args(paths=[p1, p2], output=out, sort=None, ignore_cols=True)
+        concat(args=args, list_df=[])
+        result = pl.read_parquet(out)
+        assert result.shape == (4, 3)
+        assert result.columns == ["a", "b", "c"]
+        assert result["c"].to_list() == [None, None, 9, 10]
+
+    def test_polars_concat_ignore_cols_completely_different(self, tmp_dir):
+        """共通カラムが一部だけの場合、--ignore-cols で全カラム null 埋め"""
+        from kkdf.bin.concat import concat
+        df1 = pl.DataFrame({"a": [1, 2], "b": [3, 4]})
+        df2 = pl.DataFrame({"a": [5, 6], "c": [7, 8]})
+        p1 = os.path.join(tmp_dir, "df1.parquet")
+        p2 = os.path.join(tmp_dir, "df2.parquet")
+        out = os.path.join(tmp_dir, "out.parquet")
+        df1.write_parquet(p1)
+        df2.write_parquet(p2)
+        args = make_args(paths=[p1, p2], output=out, sort=None, ignore_cols=True)
+        concat(args=args, list_df=[])
+        result = pl.read_parquet(out)
+        assert result.shape == (4, 3)
+        assert result.columns == ["a", "b", "c"]
+        assert result["b"].to_list() == [3, 4, None, None]
+        assert result["c"].to_list() == [None, None, 7, 8]
 
 
 class TestSplit:
